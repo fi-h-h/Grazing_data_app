@@ -57,3 +57,15 @@ def validate_grazing_data(grazing_table, grazing_col_name, field_table, field_co
         error_rows = grazing_table[grazing_table[grazing_col_name[0]].isin(missing_values) | grazing_table[grazing_col_name[1]].isin(missing_values)]
         st.dataframe(error_rows, width='stretch')
         return False
+    
+def create_input_table(template_data,table_index,index_name,table_key):
+    # Create pandas dataframe with template data
+    template_table = pd.DataFrame(template_data,index=table_index)
+    template_table.index.name = index_name
+    # Display table
+    edited_table = st.data_editor(
+        data=template_table, 
+        width="content",
+        key=table_key
+    )
+    return edited_table
