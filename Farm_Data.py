@@ -19,7 +19,7 @@ expected_cattle_headings = ["Ear Tag Number", "Date of birth", "M/F", "Steer?", 
 expected_field_headings = ["Field Name", "Field Area (hectare)", "Field Area (acre)"]
 expected_grazing_headings = ["Your name", "What are the weather conditions?", "Management group", "Date moved out", "Which field are the cattle moving out of?", "What does the paddock the cattle are moving out of look like?", "Date moved in",	
                              "Which field are the cattle moving into?", "How has the field been split?", "Is this the first, second, third...paddock in the field?", "How many days grazing is intended for this paddock?", "What does the pasture look like?", "What do the cattle look like?"]
-
+validation_results = []
 #Set up columns
 data_col1, data_col2, data_col3 = st.columns(3)
 
@@ -31,7 +31,7 @@ with data_col1:
 
     # Check column headings are correct
     if cattle_data_table is not None:
-        fn.validate_csv_column_headings(cattle_data_table,expected_cattle_headings,data_col1)
+         validation_results.append(fn.validate_csv_column_headings(cattle_data_table,expected_cattle_headings,data_col1))
 
 # Read in field data
 with data_col2:
@@ -41,7 +41,7 @@ with data_col2:
 
     # Check column headings are correct
     if field_data_table is not None:
-        fn.validate_csv_column_headings(field_data_table,expected_field_headings,data_col2)
+        validation_results.append(fn.validate_csv_column_headings(field_data_table,expected_field_headings,data_col2))
 
 # Read in grazing data
 with data_col3:
@@ -51,13 +51,31 @@ with data_col3:
     
     # Check column headings are correct
     if grazing_data_table is not None:
-        fn.validate_csv_column_headings(grazing_data_table,expected_grazing_headings,data_col3)
+        validation_results.append(fn.validate_csv_column_headings(grazing_data_table,expected_grazing_headings,data_col3))
 
     # Check field names in grazing file matches data in field file
     if grazing_data_table is not None and field_data_table is not None:
-        fn.validate_grazing_data(grazing_data_table, ["Which field are the cattle moving out of?", "Which field are the cattle moving into?"], field_data_table, "Field Name")
+        validation_results.append(fn.validate_grazing_data(grazing_data_table, ["Which field are the cattle moving out of?", "Which field are the cattle moving into?"], field_data_table, "Field Name"))
 
 st.divider()
+
+# Check that there are no errors in the data input before moving on
+if cattle_data_table is not None and field_data_table is not None and grazing_data_table is not None and all(validation_results):
+
+    # --- DATA ANALYSIS SECTION ---
+    # Set up page header
+    st.title("📊 Data Analysis",text_alignment="center")
+    st.divider()
+
+    # Add option buttons
+    st.subheader("What would you like to calculate?")
+    left_space, button_col1, button_col2, right_space = st.columns([2, 2, 2, 2])
+    with button_col1:
+        st.button("Calculate Animal Days per Unit Area", type="primary",width="stretch")
+    with button_col2:
+        st.button("Calculate Field Rest Period Data",type="primary",width="stretch")
+else:
+    st.error("❌ Data input errors must be fixed before continuing")
 
 
 

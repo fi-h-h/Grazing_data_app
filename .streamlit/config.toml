@@ -1,0 +1,15 @@
+[theme]
+# The main accent color (Buttons, active tabs, etc.)
+primaryColor = "#2E7D32" 
+
+# The main background color
+backgroundColor = "#0E1117" 
+
+# Background for sidebars and input widgets
+secondaryBackgroundColor = "#262730" 
+
+# The color of your main text
+textColor = "#FAFAFA" 
+
+# The font used throughout the app
+font = "sans serif"

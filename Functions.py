@@ -27,9 +27,11 @@ def validate_csv_column_headings(data_table,expected_headings, col_container):
         
         if not missing_cols:
             col_container.success(f"✅ csv columns validated!")
+            return True
         else:
             # Display a clear error message
             col_container.error(f"❌ Required column missing in csv. Missing: {', '.join(missing_cols)}")
+            return False
 
 def validate_grazing_data(grazing_table, grazing_col_name, field_table, field_col_name):
     # Pull out columns to compare
@@ -44,12 +46,14 @@ def validate_grazing_data(grazing_table, grazing_col_name, field_table, field_co
     if not missing_values:
         # Show sucess
         st.success(f"✅ All field names in **Grazing Data** exist in **Field Data**.")
+        return True
     else:
         #List the unknown field names
-        st.error(f"⚠️ Found {len(missing_values)} unknown field names!  \n The following fields in the Grazing Data are not defined in the Field Data**:")
+        st.error(f"❌ Found {len(missing_values)} unknown field names!  \n The following fields in the Grazing Data are not defined in the Field Data**:")
         st.write(list(missing_values))
         
         # Show the actual rows in the source file that have the error
-        st.error(f"Rows in the Grazing Data requiring correction:")
+        st.error(f"❌ Rows in the Grazing Data requiring correction:")
         error_rows = grazing_table[grazing_table[grazing_col_name[0]].isin(missing_values) | grazing_table[grazing_col_name[1]].isin(missing_values)]
         st.dataframe(error_rows, width='stretch')
+        return False
