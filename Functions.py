@@ -69,3 +69,49 @@ def create_input_table(template_data,table_index,index_name,table_key):
         key=table_key
     )
     return edited_table
+
+
+def calculate_animal_groups(calculation_date,cattle_data,lu_data):
+    # Ensure all dates are datetime objects
+    corrected_calculation_date = pd.to_datetime(calculation_date,dayfirst=True)
+    date_cols = ["Date of birth", "Date on farm", "Date off farm"]
+    for col in date_cols:
+        cattle_data[col] = pd.to_datetime(cattle_data[col], errors='raise',dayfirst=True)
+
+    # Filter to Only keep animals that were ON the farm on the calculation date
+    mask = (cattle_data["Date of birth"] <= corrected_calculation_date) & \
+            (cattle_data["Date on farm"] <= corrected_calculation_date) & \
+            ((cattle_data["Date off farm"].isna()) | (cattle_data["Date off farm"] > corrected_calculation_date))
+    
+    active_cattle = cattle_data[mask].copy()
+
+    # Calculate age in months
+    active_cattle["Age (months)"] = (((corrected_calculation_date - active_cattle["Date of birth"]).dt.days)/30.4735).round(1)
+
+    def assign_lu_and_group(row):
+        age_months = row["Age (months)"]
+        is_female = str(row["M/F"]).strip().upper() == "F"
+        is_bull = str(row["Bull?"]).strip().upper() in ["YES", "Y", "TRUE"]
+
+        if age_months < 3:
+            return "Calf", lu_data.iloc[4]
+        elif age_months >= 3 and age_months < 6:
+            return "Calf", lu_data.iloc[3]
+        elif age_months >= 6 and age_months < 12:
+            return "Calf", lu_data.iloc[2]
+        elif age_months >= 12 and age_months < 24:
+            return "Youngstock", lu_data.iloc[1]
+        elif age_months >= 24 and is_bull:
+            return "Bull", lu_data.iloc[0]
+        elif age_months >= 24 and is_female:
+            return "Cow", lu_data.iloc[0]
+        else:
+            return "Steer", lu_data.iloc[0]
+    
+    # Apply the logic
+    results = active_cattle.apply(assign_lu_and_group, axis=1)
+    active_cattle[["Group", "Livestock Unit"]] = pd.DataFrame(results.tolist(), index=active_cattle.index)
+
+    # 4. SELECT FINAL COLUMNS
+    final_cattle_df = active_cattle[["Ear Tag Number", "Group", "Age (months)", "Livestock Unit"]]
+    return final_cattle_df

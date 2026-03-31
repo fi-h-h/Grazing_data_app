@@ -16,10 +16,10 @@ st.title("🔢 Data Input",text_alignment="center")
 st.divider()
 
 # Define expected headings
-expected_cattle_headings = ["Ear Tag Number", "Date of birth", "M/F", "Steer?", "Heifer?", "Date on farm", "Date off farm"]
+expected_cattle_headings = ["Ear Tag Number", "Date of birth", "M/F", "Bull?", "Date on farm", "Date off farm"]
 expected_field_headings = ["Field Name", "Field Area (Hectare)", "Field Area (Acre)"]
 expected_grazing_headings = ["Your name", "What are the weather conditions?", "Management group", "Date moved out", "Which field are the cattle moving out of?", "What does the paddock the cattle are moving out of look like?", "Date moved in",	
-                             "Which field are the cattle moving into?", "How has the field been split?", "Is this the first, second, third...paddock in the field?", "How many days grazing is intended for this paddock?", "What does the pasture look like?", "What do the cattle look like?"]
+                            "Which field are the cattle moving into?", "How has the field been split?", "Is this the first, second, third...paddock in the field?", "How many days grazing is intended for this paddock?", "What does the pasture look like?", "What do the cattle look like?"]
 validation_results = []
 #Set up columns
 data_col1, data_col2, data_col3 = st.columns(3)
@@ -32,7 +32,7 @@ with data_col1:
 
     # Check column headings are correct
     if cattle_data_table is not None:
-         validation_results.append(fn.validate_csv_column_headings(cattle_data_table,expected_cattle_headings,data_col1))
+        validation_results.append(fn.validate_csv_column_headings(cattle_data_table,expected_cattle_headings,data_col1))
 
 # Read in field data
 with data_col2:
@@ -73,6 +73,8 @@ if "livestock_unit" not in st.session_state:
     st.session_state.livestock_unit = False
 if "rest_data" not in st.session_state:
     st.session_state.rest_data = False
+if "calculate" not in st.session_state:
+    st.session_state.calculate = False
 st.subheader("What would you like to calculate?")
 left_space, button_col1, button_col2, right_space = st.columns([2, 2, 2, 2])
 with button_col1:
@@ -106,6 +108,20 @@ if st.session_state.livestock_unit:
         # Create date picker to input start and end dates
         start_date = st.date_input("Start Date", value=dt.date.today(),format="DD/MM/YYYY")
         end_date = st.date_input("End Date", value=dt.date.today(),format="DD/MM/YYYY")
+    
+    st.divider()
+    
+    # Set calculate button
+    if st.button("Calculate", type="primary",width="content"):
+        st.session_state.calculate = True
+    if st.session_state.calculate:
+        animal_groups = fn.calculate_animal_groups(start_date,cattle_data_table,lu_input_parameters["VALUE"])
+        st.dataframe(data=animal_groups, width="content",hide_index=True,key="animal_groups_table")
+        
+
+
+
+
 
 
 # --- Field Rest Period section ---
