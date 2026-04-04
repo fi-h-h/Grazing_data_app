@@ -60,76 +60,71 @@ with data_col3:
 
 st.divider()
 
-# Check that there are no errors in the data input before moving on
-#if cattle_data_table is not None and field_data_table is not None and grazing_data_table is not None and all(validation_results):
-
 # --- DATA ANALYSIS SECTION ---
+
 # Set up page header
 st.title("📊 Data Analysis",text_alignment="center")
 st.divider()
 
-# Add option buttons
-if "livestock_unit" not in st.session_state:
-    st.session_state.livestock_unit = False
-if "rest_data" not in st.session_state:
-    st.session_state.rest_data = False
-if "calculate" not in st.session_state:
-    st.session_state.calculate = False
-st.subheader("What would you like to calculate?")
-left_space, button_col1, button_col2, right_space = st.columns([2, 2, 2, 2])
-with button_col1:
-    if st.button("Calculate Animal Days per Unit Area", type="primary",width="stretch"):
-        st.session_state.livestock_unit = True
-        st.session_state.rest_data = False
-with button_col2:
-    if st.button("Calculate Field Rest Period Data",type="primary",width="stretch"):
-        st.session_state.rest_data = True
+# Check that there are no errors in the data input before moving on
+if cattle_data_table is not None and field_data_table is not None and grazing_data_table is not None and all(validation_results):
+    # Add option buttons
+    if "livestock_unit" not in st.session_state:
         st.session_state.livestock_unit = False
-st.divider()
-
-# --- Livestock Unit/Animal Days per Unit Area section ---
-if st.session_state.livestock_unit:
-    st.info("Please enter the livestock units, unit area, and timescale you wish to use for the calculation")
-
-    # Set up columns
-    lu_col1, lu_col2, lu_col3 = st.columns(3)
-
-    with lu_col1:
-        # Create table to input the livestock units into
-        template_lu_data = {"VALUE": [1,0.5,0.3,0.2,0.1]}
-        template_lu_index = ["ANIMALS 2+ YEARS","ANIMALS 12-24 MONTHS","ANIMALS 6-12 MONTHS","ANIMALS 3-6 MONTHS","ANIMALS 0-3 MONTHS"]
-        lu_input_parameters = fn.create_input_table(template_lu_data,template_lu_index,"LIVESTOCK UNIT","livestock_unit_data")
-
-    with lu_col2:
-        # Create radio button to select area unit
-        area_unit = st.radio("AREA UNIT",["Acre", "Hectare"],horizontal=True)
-
-    with lu_col3:
-        # Create date picker to input start and end dates
-        start_date = st.date_input("Start Date", value=dt.date.today(),format="DD/MM/YYYY")
-        end_date = st.date_input("End Date", value=dt.date.today(),format="DD/MM/YYYY")
-    
+    if "rest_data" not in st.session_state:
+        st.session_state.rest_data = False
+    if "calculate" not in st.session_state:
+        st.session_state.calculate = False
+    st.subheader("What would you like to calculate?")
+    left_space, button_col1, button_col2, right_space = st.columns([2, 2, 2, 2])
+    with button_col1:
+        if st.button("Calculate Animal Days per Unit Area", type="primary",width="stretch"):
+            st.session_state.livestock_unit = True
+            st.session_state.rest_data = False
+    with button_col2:
+        if st.button("Calculate Field Rest Period Data",type="primary",width="stretch"):
+            st.session_state.rest_data = True
+            st.session_state.livestock_unit = False
     st.divider()
-    
-    # Set calculate button
-    if st.button("Calculate", type="primary",width="content"):
-        st.session_state.calculate = True
-    if st.session_state.calculate:
-        animal_groups = fn.calculate_animal_groups(start_date,cattle_data_table,lu_input_parameters["VALUE"])
-        st.dataframe(data=animal_groups, width="content",hide_index=True,key="animal_groups_table")
-        
 
+    # --- Livestock Unit/Animal Days per Unit Area section ---
+    if st.session_state.livestock_unit:
+        st.info("Please enter the livestock units, unit area, and timescale you wish to use for the calculation")
 
+        # Set up columns
+        lu_col1, lu_col2, lu_col3 = st.columns(3)
 
+        with lu_col1:
+            # Create table to input the livestock units into
+            template_lu_data = {"VALUE": [1,0.5,0.3,0.2,0.1]}
+            template_lu_index = ["ANIMALS 2+ YEARS","ANIMALS 12-24 MONTHS","ANIMALS 6-12 MONTHS","ANIMALS 3-6 MONTHS","ANIMALS 0-3 MONTHS"]
+            lu_input_parameters = fn.create_input_table(template_lu_data,template_lu_index,"LIVESTOCK UNIT","livestock_unit_data")
 
+        with lu_col2:
+            # Create radio button to select area unit
+            area_unit = st.radio("AREA UNIT",["Acre", "Hectare"],horizontal=True)
 
+        with lu_col3:
+            # Create date picker to input start and end dates
+            start_date = st.date_input("Start Date", value=dt.date.today(),format="DD/MM/YYYY")
+            end_date = st.date_input("End Date", value=dt.date.today(),format="DD/MM/YYYY")
 
-# --- Field Rest Period section ---
-if st.session_state.rest_data:
-    st.warning("The field rest data feature has not yet been implemented ☹️")
+        st.divider()
 
-#else:
-#    st.error("❌ Data input errors must be fixed before continuing")
+        # Set calculate button
+        if st.button("Calculate", type="primary",width="content"):
+            st.session_state.calculate = True
+        if st.session_state.calculate:
+            # Calculate animal groups
+            animal_days_per_unit_area = fn.calculate_animal_days_per_area_fast(grazing_data_table,cattle_data_table,field_data_table,area_unit, lu_input_parameters["VALUE"])
+            st.dataframe(data=animal_days_per_unit_area, width="content",hide_index=True,key="animal_days_per_unit_area_table")
+
+    # --- Field Rest Period section ---
+    if st.session_state.rest_data:
+        st.warning("The field rest data feature has not yet been implemented ☹️")
+
+else:
+        st.error("❌ Data input errors must be fixed before continuing")
 
 
 

@@ -1,5 +1,19 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
+import re
+
+def extract_number(value):
+    # If it's already a number, just return it
+    if isinstance(value, (int, float)):
+        return float(value)
+    
+    # If it's a string pull out the number
+    if isinstance(value, str):
+        # This regex finds digits and decimal points
+        match = re.search(r"(\d+\.?\d*)", value)
+        if match:
+            return float(match.group(1))
 
 @st.cache_data
 def load_csv(file):
@@ -71,47 +85,130 @@ def create_input_table(template_data,table_index,index_name,table_key):
     return edited_table
 
 
-def calculate_animal_groups(calculation_date,cattle_data,lu_data):
-    # Ensure all dates are datetime objects
-    corrected_calculation_date = pd.to_datetime(calculation_date,dayfirst=True)
-    date_cols = ["Date of birth", "Date on farm", "Date off farm"]
-    for col in date_cols:
-        cattle_data[col] = pd.to_datetime(cattle_data[col], errors='raise',dayfirst=True)
-
-    # Filter to Only keep animals that were ON the farm on the calculation date
-    mask = (cattle_data["Date of birth"] <= corrected_calculation_date) & \
-            (cattle_data["Date on farm"] <= corrected_calculation_date) & \
-            ((cattle_data["Date off farm"].isna()) | (cattle_data["Date off farm"] > corrected_calculation_date))
+def calculate_animal_groups(calc_date,cattle_data,lu_data):
+    # Filter active cattle
+    mask = (cattle_data["Date of birth"] <= calc_date) & \
+        (cattle_data["Date on farm"] <= calc_date) & \
+        ((cattle_data["Date off farm"].isna()) | (cattle_data["Date off farm"] > calc_date))
     
-    active_cattle = cattle_data[mask].copy()
-
-    # Calculate age in months
-    active_cattle["Age (months)"] = (((corrected_calculation_date - active_cattle["Date of birth"]).dt.days)/30.4735).round(1)
-
-    def assign_lu_and_group(row):
-        age_months = row["Age (months)"]
-        is_female = str(row["M/F"]).strip().upper() == "F"
-        is_bull = str(row["Bull?"]).strip().upper() in ["YES", "Y", "TRUE"]
-
-        if age_months < 3:
-            return "Calf", lu_data.iloc[4]
-        elif age_months >= 3 and age_months < 6:
-            return "Calf", lu_data.iloc[3]
-        elif age_months >= 6 and age_months < 12:
-            return "Calf", lu_data.iloc[2]
-        elif age_months >= 12 and age_months < 24:
-            return "Youngstock", lu_data.iloc[1]
-        elif age_months >= 24 and is_bull:
-            return "Bull", lu_data.iloc[0]
-        elif age_months >= 24 and is_female:
-            return "Cow", lu_data.iloc[0]
-        else:
-            return "Steer", lu_data.iloc[0]
+    active = cattle_data[mask].copy()
+    age_months = ((calc_date - active["Date of birth"]).dt.days / 30.4735)
     
-    # Apply the logic
-    results = active_cattle.apply(assign_lu_and_group, axis=1)
-    active_cattle[["Group", "Livestock Unit"]] = pd.DataFrame(results.tolist(), index=active_cattle.index)
+    # Define logic bins
+    # Bins: 0-3, 3-6, 6-12, 12-24, 24+
+    labels = ["calves_03", "calves_36", "calves_612", "youngstock", "adults"]
+    active["Group_Key"] = pd.cut(age_months, bins=[0, 3, 6, 12, 24, 1000], labels=labels)
+    
+    # Map specific lus from lu_data
+    lu_lookup = {
+        "calves_03": lu_data.iloc[4], "calves_36": lu_data.iloc[3],
+        "calves_612": lu_data.iloc[2], "youngstock": lu_data.iloc[1], "adults": lu_data.iloc[0]
+    }
+    active["Livestock Unit"] = active["Group_Key"].map(lu_lookup).astype(float)
+    
+    # Map final Group Names for matching
+    # Define conditions for the 'adults' category (24+ months)
+    is_adult = (active["Group_Key"] == "adults")
+    is_female = (active["M/F"].astype(str).str.strip().str.upper() == "F")
+    is_bull = (active["Bull?"].astype(str).str.strip().str.upper().isin(["YES", "Y", "TRUE"]))
+    # Assign specific names to the adults
+    conditions = [
+        (is_adult & is_bull),
+        (is_adult & is_female),
+        (is_adult)
+    ]
+    choices = ["bulls", "cows", "steer"]
+    active["Group"] = np.select(conditions, choices, default=None)
+    # Fill in the non-adults (calves and youngstock)
+    name_map = {
+        "calves_03": "calves", 
+        "calves_36": "calves", 
+        "calves_612": "calves", 
+        "youngstock": "youngstock"
+    }
+    active["Group"] = active["Group"].fillna(active["Group_Key"].map(name_map))
+    
+    return active.groupby("Group")["Livestock Unit"].sum().to_dict()
 
-    # 4. SELECT FINAL COLUMNS
-    final_cattle_df = active_cattle[["Ear Tag Number", "Group", "Age (months)", "Livestock Unit"]]
-    return final_cattle_df
+def calculate_animal_days_per_area_fast(grazing_data_table, cattle_data_table, field_table, field_area_unit, lu_data):
+    # Pre-process dates
+    grazing_data_table['Date moved out'] = pd.to_datetime(grazing_data_table['Date moved out'], dayfirst=True,format='%d-%b-%y')
+    grazing_data_table['Date moved in'] = pd.to_datetime(grazing_data_table['Date moved in'], dayfirst=True,format='%d-%b-%y')
+    cattle_data_table['Date of birth'] = pd.to_datetime(cattle_data_table['Date of birth'], dayfirst=True)
+    cattle_data_table['Date on farm'] = pd.to_datetime(cattle_data_table['Date on farm'], dayfirst=True)
+    cattle_data_table['Date off farm'] = pd.to_datetime(cattle_data_table['Date off farm'], dayfirst=True)
+
+    # Field Area lookup
+    area_col = 'Field Area (Hectare)' if field_area_unit == "Hectare" else 'Field Area (Acre)'
+    field_area_map = dict(zip(field_table['Field Name'], field_table[area_col]))
+
+    # Pre-index grazing table
+    results = []
+    out_records = grazing_data_table[grazing_data_table['Which field are the cattle moving out of?'] != 
+                                    grazing_data_table['Which field are the cattle moving into?']]
+    
+    # Iterate through fields in field table
+    for field_name in field_table['Field Name']:
+        out_date_str = "-"
+        total_lu = 0.0
+        days_in_field = 0
+        animal_days = 0.0
+        base_area = field_area_map.get(field_name, 0)
+        paddock_use = 1.0
+        effective_area = base_area * paddock_use
+
+        # Find OUT record
+        row_out = out_records[out_records['Which field are the cattle moving out of?'] == field_name]
+        
+        if not row_out.empty:
+            out_idx = row_out.index[0]
+            out_date = row_out.at[out_idx, 'Date moved out']
+            out_date_str = out_date.strftime('%d/%m/%Y')
+            mgmt_group = str(row_out.at[out_idx, 'Management group']).lower()
+            
+            # Find the IN record
+            in_date = out_date
+            multiple_paddocks = False
+            past_moves = grazing_data_table.iloc[out_idx + 1:]
+            match_in = past_moves[past_moves['Which field are the cattle moving into?'] == field_name]
+            
+            if not match_in.empty:
+                for index, row in match_in.iterrows():
+                    if row['Which field are the cattle moving into?'] != row['Which field are the cattle moving out of?']:
+                        in_date = row['Date moved in']
+                        paddock_use = extract_number(row['How has the field been split?'])
+                        
+                        if multiple_paddocks:
+                            paddock_use = 1.0
+                        break # This is your 'Exit For'
+                    else:
+                        multiple_paddocks = True
+            
+            # Calculate days in field
+            days_in_field = (out_date - in_date).days
+            if days_in_field > 0:
+                # Get livestock units for date
+                lu_sums = calculate_animal_groups(out_date,cattle_data_table,lu_data)
+                
+                # Check which groups match management_group
+                total_lu = 0
+                for group_name in ['cows', 'calves', 'youngstock', 'bulls','steers']:
+                    if group_name in mgmt_group:
+                        total_lu += lu_sums.get(group_name, 0)
+                
+                # Calculate field area
+                effective_area = base_area * paddock_use
+                
+                # Calculate animal days per unit area
+                animal_days = round((total_lu * days_in_field) / effective_area, 1)
+                
+        results.append({
+            'Field': field_name,
+            'Date': out_date_str,
+            'Total Livestock Units': total_lu,
+            'Paddock Area': effective_area,
+            'Grazing Period': days_in_field,
+            'AnimalDays/Area': animal_days
+        })
+
+    return pd.DataFrame(results)
