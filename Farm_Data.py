@@ -101,14 +101,30 @@ if cattle_data_table is not None and field_data_table is not None and grazing_da
         with lu_col3:
             # Create date picker to input start and end dates
             start_date = st.date_input("START DATE", value=dt.date.today(),format="DD/MM/YYYY")
+            start_date = pd.to_datetime(start_date)
             end_date = st.date_input("END DATE", value=dt.date.today(),format="DD/MM/YYYY")
+            end_date = pd.to_datetime(end_date)
+
 
         st.divider()
 
-        # Calculate animal groups
+        # Check you have all the input parameters
         if lu_input_parameters is not None and area_unit is not None and start_date is not None and end_date is not None:
-            animal_days_per_unit_area = fn.calculate_animal_days_per_area_fast(grazing_data_table,cattle_data_table,field_data_table,area_unit, lu_input_parameters["VALUE"])
+            # Calculate animal days per unit area for most recent grazing
+            animal_days_per_unit_area = fn.calculate_most_recent_animal_days_per_area(grazing_data_table,cattle_data_table,field_data_table,area_unit, lu_input_parameters["VALUE"])
             st.dataframe(data=animal_days_per_unit_area, width="content",hide_index=True,key="animal_days_per_unit_area_table")
+
+            # Calculate animal days per unit area over time
+            all_grazing_events = fn.calculate_all_grazing_events(start_date,end_date,grazing_data_table,cattle_data_table,field_data_table,area_unit, lu_input_parameters["VALUE"])
+            if all_grazing_events.empty:
+                st.warning("⚠️ No grazing events found in the specified time period")
+            else:
+                animal_days_summary = fn.summary_of_animal_days_per_area_over_time(all_grazing_events,area_unit)
+                st.dataframe(animal_days_summary, width="content")
+                list_of_fields_in_time_period = animal_days_summary['FIELD'].unique().tolist()
+                list_of_fields_in_time_period = ["All"] + list_of_fields_in_time_period
+                selected_field = st.selectbox("Select a Field to View History", list_of_fields_in_time_period)
+                fn.plot_animal_days_for_field(all_grazing_events,selected_field, area_unit)
 
     # --- Field Rest Period section ---
     if st.session_state.rest_data:

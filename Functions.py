@@ -158,7 +158,7 @@ def calculate_animal_groups(calc_date,cattle_data,lu_data):
     
     return active.groupby("Group")["Livestock Unit"].sum().to_dict()
 
-def calculate_animal_days_per_area_fast(grazing_data_table, cattle_data_table, field_table, field_area_unit, lu_data):
+def calculate_most_recent_animal_days_per_area(grazing_data_table, cattle_data_table, field_table, field_area_unit, lu_data):
 
     # Field Area lookup
     area_col = 'Field Area (Hectare)' if field_area_unit == "Hectare" else 'Field Area (Acre)'
@@ -166,8 +166,7 @@ def calculate_animal_days_per_area_fast(grazing_data_table, cattle_data_table, f
 
     # Pre-index grazing table
     results = []
-    out_records = grazing_data_table[grazing_data_table['Which field are the cattle moving out of?'] != 
-                                    grazing_data_table['Which field are the cattle moving into?']]
+    out_records = grazing_data_table[grazing_data_table['Which field are the cattle moving out of?'] != grazing_data_table['Which field are the cattle moving into?']]
     
     # Iterate through fields in field table
     for field_name in field_table['Field Name']:
@@ -234,3 +233,100 @@ def calculate_animal_days_per_area_fast(grazing_data_table, cattle_data_table, f
         })
 
     return pd.DataFrame(results)
+
+def calculate_all_grazing_events(start_date,end_date,grazing_data_table, cattle_data_table, field_table, field_area_unit, lu_data):
+    # Field Area lookup
+    area_col = 'Field Area (Hectare)' if field_area_unit == "Hectare" else 'Field Area (Acre)'
+    field_area_map = dict(zip(field_table['Field Name'], field_table[area_col]))
+
+    results = []
+
+    # Filter for date period
+    mask = (pd.to_datetime(grazing_data_table['Date moved out']) <= end_date) & (pd.to_datetime(grazing_data_table['Date moved out']) >= start_date)
+    filtered_grazing_data = grazing_data_table[mask].copy()
+
+    # Filter for all valid "Out" records
+    out_movements = filtered_grazing_data[filtered_grazing_data['Which field are the cattle moving out of?'] != filtered_grazing_data['Which field are the cattle moving into?']].copy()
+
+    # 3. Iterate through every "Out" movement found in the table
+    for out_idx, row_out in out_movements.iterrows():
+        field_name = row_out['Which field are the cattle moving out of?']
+            
+        out_date = row_out['Date moved out']
+        mgmt_group = str(row_out['Management group']).lower()
+        base_area = field_area_map.get(field_name, 0)
+
+        # Find the corresponding "In" record
+        in_date = out_date
+        paddock_use = 1.0
+        multiple_paddocks = False
+        
+        past_moves = filtered_grazing_data.iloc[out_idx + 1:]
+        match_in = past_moves[past_moves['Which field are the cattle moving into?'] == field_name]
+        
+        if not match_in.empty:
+            for index, row in match_in.iterrows():
+                if row['Which field are the cattle moving into?'] != row['Which field are the cattle moving out of?']:
+                    in_date = row['Date moved in']
+                    paddock_use = extract_number(row['How has the field been split?'])
+                    
+                    if multiple_paddocks:
+                        paddock_use = 1.0
+                    break 
+                else:
+                    multiple_paddocks = True
+
+        # Calculate days in field
+        days_in_field = (out_date - in_date).days
+        if days_in_field > 0:
+            # Get livestock units for date
+            lu_sums = calculate_animal_groups(out_date,cattle_data_table,lu_data)
+            
+            # Check which groups match management_group
+            total_lu = 0
+            for group_name in ['cows', 'calves', 'youngstock', 'bulls','steers']:
+                if group_name in mgmt_group:
+                    total_lu += lu_sums.get(group_name, 0)
+            
+            # Calculate field area
+            effective_area = base_area * paddock_use
+
+            # Calculate animal days per unit area
+            animal_days = round((total_lu * days_in_field) / effective_area, 1) if effective_area > 0 else 0
+            
+            results.append({
+                'FIELD': field_name,
+                'DATE': out_date.strftime('%d/%m/%Y'),
+                'TOTAL LIVESTOCK UNITS': total_lu,
+                'PADDOCK AREA': effective_area,
+                'GRAZING PERIOD': days_in_field,
+                f'ANIMAL DAYS/{str(field_area_unit).upper()}': animal_days
+            })
+
+    # Return every single event found
+    return pd.DataFrame(results)
+
+def summary_of_animal_days_per_area_over_time(full_table,field_area_unit):
+    # Group by the 'FIELD' column and calculate:
+    field_summary = full_table.groupby('FIELD')[f'ANIMAL DAYS/{str(field_area_unit).upper()}'].agg(['count', 'sum', 'mean']).reset_index()
+
+    # Set colum names and round numbers
+    field_summary.columns = ['FIELD','NUMBER OF GRAZING EVENTS',f'TOTAL ANIMAL DAYS/{str(field_area_unit).upper()}',f'AVERAGE ANIMAL DAYS/{str(field_area_unit).upper()}']
+    field_summary[f'TOTAL ANIMAL DAYS/{str(field_area_unit).upper()}'] = field_summary[f'TOTAL ANIMAL DAYS/{str(field_area_unit).upper()}'].round(1)
+    field_summary[f'AVERAGE ANIMAL DAYS/{str(field_area_unit).upper()}'] = field_summary[f'AVERAGE ANIMAL DAYS/{str(field_area_unit).upper()}'].round(1)
+    return field_summary
+
+def plot_animal_days_for_field(all_grazing_events_data,selected_field, area_unit):
+    # Filter the data for that field
+    field_history = all_grazing_events_data[all_grazing_events_data['FIELD'] == selected_field].copy()
+
+    # Convert 'DATE' back to a datetime object so it sorts correctly on the graph
+    field_history['DATE'] = pd.to_datetime(field_history['DATE'], dayfirst=True)
+    field_history = field_history.sort_values('DATE')
+
+    # Plot line chart
+    st.subheader(f'Animal days/{str(area_unit).upper()} over time for {selected_field}')
+    if selected_field == "All":
+        st.line_chart(data=all_grazing_events_data, x='DATE', y=f'ANIMAL DAYS/{str(area_unit).upper()}', color='FIELD')
+    else:
+        st.line_chart(data=field_history, x='DATE', y=f'ANIMAL DAYS/{str(area_unit).upper()}')
