@@ -83,6 +83,7 @@ if cattle_data_table is not None and field_data_table is not None and grazing_da
 
     # --- Livestock Unit/Animal Days per Unit Area section ---
     if st.session_state.livestock_unit:
+        st.title("🐄 Animal Days/Unit Area Output",text_alignment="center")
         st.info("**Please enter the livestock units, unit area, and timescale you wish to use for the calculation**")
 
         # Set up columns
@@ -111,10 +112,13 @@ if cattle_data_table is not None and field_data_table is not None and grazing_da
         # Check you have all the input parameters
         if lu_input_parameters is not None and area_unit is not None and start_date is not None and end_date is not None:
             # Calculate animal days per unit area for most recent grazing
+            st.subheader("Most Recent Grazing Event")
             animal_days_per_unit_area = fn.calculate_most_recent_animal_days_per_area(grazing_data_table,cattle_data_table,field_data_table,area_unit, lu_input_parameters["VALUE"])
             st.dataframe(data=animal_days_per_unit_area, width="content",hide_index=True,key="animal_days_per_unit_area_table")
+            st.divider()
 
             # Calculate animal days per unit area over time
+            st.subheader(f"Grazing Data Over Time from {start_date.strftime('%d/%m/%Y')} to {end_date.strftime('%d/%m/%Y')}")
             all_grazing_events = fn.calculate_all_grazing_events(start_date,end_date,grazing_data_table,cattle_data_table,field_data_table,area_unit, lu_input_parameters["VALUE"])
             if all_grazing_events.empty:
                 st.warning("⚠️ No grazing events found in the specified time period")

@@ -325,7 +325,7 @@ def plot_animal_days_for_field(all_grazing_events_data,selected_field, area_unit
     field_history = field_history.sort_values('DATE')
 
     # Plot line chart
-    st.subheader(f'Animal days/{str(area_unit).upper()} over time for {selected_field}')
+    st.subheader(f'Animal days/{area_unit} over time for {selected_field}')
     if selected_field == "All":
         st.line_chart(data=all_grazing_events_data, x='DATE', y=f'ANIMAL DAYS/{str(area_unit).upper()}', color='FIELD')
     else:
