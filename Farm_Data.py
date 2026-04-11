@@ -7,7 +7,24 @@ import Functions as fn
 st.set_page_config(layout="wide")
 
 # Set the page title
-st.set_page_config(page_title="Farm Data")
+st.set_page_config(page_title="Farm Grazing Data")
+
+# --- INITIALISE VARIABLES ---
+if 'cattle_data_table' not in st.session_state:
+    st.session_state.cattle_data_table = pd.DataFrame()
+if 'field_data_table' not in st.session_state:
+    st.session_state.field_data_table = pd.DataFrame()
+if 'grazing_data_table' not in st.session_state:
+    st.session_state.grazing_data_table = pd.DataFrame()
+validation_results = []
+lu_input_parameters = None
+area_unit = None
+start_date = None
+end_date = None
+animal_days_per_unit_area = pd.DataFrame()
+all_grazing_events = pd.DataFrame()
+animal_days_summary = pd.DataFrame()
+list_of_fields_in_time_period = pd.DataFrame()
 
 # --- DATA INPUT SECTION ---
 
@@ -16,41 +33,42 @@ with st.sidebar:
     st.title("🔢 Data Input",text_alignment="center")
     st.divider()
 
+    # 
+
     # Define expected headings
     expected_cattle_headings = ["Ear Tag Number", "Date of birth", "M/F", "Bull?", "Date on farm", "Date off farm"]
     expected_field_headings = ["Field Name", "Field Area (Hectare)", "Field Area (Acre)"]
     expected_grazing_headings = ["Your name", "Management group", "Date moved out", "Which field are the cattle moving out of?", "What does the paddock the cattle are moving out of look like?", "Date moved in",	
                                 "Which field are the cattle moving into?", "How has the field been split?", "Is this the first, second, third...paddock in the field?", "What does the pasture look like?", "What do the cattle look like?"]
-    validation_results = []
 
     # Read in cattle data
     st.subheader("🤠 Cattle Data")
     st.info(f"**Upload a CSV file of your cattle data**")
-    cattle_data_table = fn.process_csv("Choose a cattle data CSV file",f"Column headings should be:  \n{expected_cattle_headings}")
+    st.session_state.cattle_data_table = fn.process_csv("Choose a cattle data CSV file",f"Column headings should be:  \n{expected_cattle_headings}")
     # Check column headings are correct
-    if cattle_data_table is not None:
-        validation_results.append(fn.validate_csv_column_headings(cattle_data_table,expected_cattle_headings))
+    if not st.session_state.cattle_data_table.empty:
+        validation_results.append(fn.validate_csv_column_headings(st.session_state.cattle_data_table,expected_cattle_headings))
 
     # Read in field data
     st.subheader("🌿 Field Data")
     st.info(f"**Upload a CSV file of your field data**")
-    field_data_table = fn.process_csv("Choose a field data CSV file",f"Column headings should be:  \n{expected_field_headings}")
+    st.session_state.field_data_table = fn.process_csv("Choose a field data CSV file",f"Column headings should be:  \n{expected_field_headings}")
     # Check column headings are correct
-    if field_data_table is not None:
-        validation_results.append(fn.validate_csv_column_headings(field_data_table,expected_field_headings))
+    if not st.session_state.field_data_table.empty:
+        validation_results.append(fn.validate_csv_column_headings(st.session_state.field_data_table,expected_field_headings))
 
     # Read in grazing data
     st.subheader("🐮 Grazing Data")
     st.info("**Upload a CSV file of your grazing data from the google form**")
-    grazing_data_table = fn.process_csv("Choose a grazing data CSV file","Ensure field names match those in the field data csv and entries are in calendar order - newest at the top to oldest at the bottom")
+    st.session_state.grazing_data_table = fn.process_csv("Choose a grazing data CSV file","Ensure field names match those in the field data csv and entries are in calendar order - newest at the top to oldest at the bottom")
     # Check column headings are correct
-    if grazing_data_table is not None:
-        validation_results.append(fn.validate_csv_column_headings(grazing_data_table,expected_grazing_headings))
-        validation_results.append(fn.validate_date_order(grazing_data_table,"Date moved out"))
-        validation_results.append(fn.validate_date_order(grazing_data_table,"Date moved in"))
+    if not st.session_state.grazing_data_table.empty:
+        validation_results.append(fn.validate_csv_column_headings(st.session_state.grazing_data_table,expected_grazing_headings))
+        validation_results.append(fn.validate_date_order(st.session_state.grazing_data_table,"Date moved out"))
+        validation_results.append(fn.validate_date_order(st.session_state.grazing_data_table,"Date moved in"))
     # Check field names in grazing file matches data in field file
-    if grazing_data_table is not None and field_data_table is not None:
-        validation_results.append(fn.validate_grazing_data(grazing_data_table, ["Which field are the cattle moving out of?", "Which field are the cattle moving into?"], field_data_table, "Field Name"))
+    if not st.session_state.grazing_data_table.empty and not st.session_state.field_data_table.empty:
+        validation_results.append(fn.validate_grazing_data(st.session_state.grazing_data_table, ["Which field are the cattle moving out of?", "Which field are the cattle moving into?"], st.session_state.field_data_table, "Field Name"))
 
     st.divider()
 
@@ -61,7 +79,7 @@ st.title("📊 Grazing Data Analysis",text_alignment="center")
 st.divider()
 
 # Check that there are no errors in the data input before moving on
-if cattle_data_table is not None and field_data_table is not None and grazing_data_table is not None and all(validation_results):
+if not st.session_state.grazing_data_table.empty and not st.session_state.field_data_table.empty and not st.session_state.cattle_data_table.empty and all(validation_results):
     st.success("✅ All data present and validated")
     # Add option buttons
     if "livestock_unit" not in st.session_state:
@@ -87,7 +105,7 @@ if cattle_data_table is not None and field_data_table is not None and grazing_da
         st.info("**Please enter the livestock units, unit area, and timescale you wish to use for the calculation**")
 
         # Set up columns
-        lu_col1, lu_col2, lu_col3 = st.columns(3)
+        lu_col1, lu_col2, lu_col3 = st.columns(3, border=True)
 
         with lu_col1:
             # Create table to input the livestock units into
@@ -101,40 +119,50 @@ if cattle_data_table is not None and field_data_table is not None and grazing_da
 
         with lu_col3:
             # Create date picker to input start and end dates
-            start_date = st.date_input("START DATE", value=dt.date.today(),format="DD/MM/YYYY")
+            start_date = st.date_input("START DATE", value=dt.date.today(),format="DD/MM/YYYY",max_value="today")
             start_date = pd.to_datetime(start_date)
-            end_date = st.date_input("END DATE", value=dt.date.today(),format="DD/MM/YYYY")
+            end_date = st.date_input("END DATE", value=dt.date.today(),format="DD/MM/YYYY",max_value="today")
             end_date = pd.to_datetime(end_date)
-
-
-        st.divider()
 
         # Check you have all the input parameters
         if lu_input_parameters is not None and area_unit is not None and start_date is not None and end_date is not None:
-            # Calculate animal days per unit area for most recent grazing
-            st.subheader("Most Recent Grazing Event")
-            animal_days_per_unit_area = fn.calculate_most_recent_animal_days_per_area(grazing_data_table,cattle_data_table,field_data_table,area_unit, lu_input_parameters["VALUE"])
-            st.dataframe(data=animal_days_per_unit_area, width="content",hide_index=True,key="animal_days_per_unit_area_table")
-            st.divider()
 
-            # Calculate animal days per unit area over time
-            st.subheader(f"Grazing Data Over Time from {start_date.strftime('%d/%m/%Y')} to {end_date.strftime('%d/%m/%Y')}")
-            all_grazing_events = fn.calculate_all_grazing_events(start_date,end_date,grazing_data_table,cattle_data_table,field_data_table,area_unit, lu_input_parameters["VALUE"])
-            if all_grazing_events.empty:
-                st.warning("⚠️ No grazing events found in the specified time period")
-            else:
-                animal_days_summary = fn.summary_of_animal_days_per_area_over_time(all_grazing_events,area_unit)
-                st.dataframe(animal_days_summary, width="content")
+            # Columns for output
+            output_col1, output_col2 = st.columns(2,border=True)
+            with output_col1:
+                # Calculate animal days per unit area for most recent grazing
+                st.subheader("Most Recent Grazing Event",text_alignment="center")
+                animal_days_per_unit_area = fn.calculate_most_recent_animal_days_per_area(st.session_state.grazing_data_table,st.session_state.cattle_data_table,st.session_state.field_data_table,area_unit, lu_input_parameters["VALUE"])
+                
+                # Plot table of most recent grazing events
+                dynamic_height = min(len(animal_days_per_unit_area) * 35 + 40, 1000)
+                st.dataframe(data=animal_days_per_unit_area, width="stretch",hide_index=True,height=dynamic_height)
+
+            with output_col2:
+                # Calculate animal days per unit area over time
+                st.subheader(f"Grazing Data Over Time from {start_date.strftime('%d/%m/%Y')} to {end_date.strftime('%d/%m/%Y')}",text_alignment="center")
+                all_grazing_events = fn.calculate_all_grazing_events(start_date,end_date,st.session_state.grazing_data_table,st.session_state.cattle_data_table,st.session_state.field_data_table,area_unit, lu_input_parameters["VALUE"])
+                if all_grazing_events.empty:
+                    st.warning("⚠️ No grazing events found in the specified time period")
+                
+                else:
+                    # Plot table of grazing events
+                    animal_days_summary = fn.summary_of_animal_days_per_area_over_time(all_grazing_events,area_unit)
+                    dynamic_height = min(len(animal_days_summary) * 35 + 40, 1000)
+                    st.dataframe(animal_days_summary,hide_index=True, width="stretch",height=dynamic_height)
+
+            # Plot graph of user selected field or all fields
+            if not animal_days_summary.empty:
                 list_of_fields_in_time_period = animal_days_summary['FIELD'].unique().tolist()
                 list_of_fields_in_time_period = ["All"] + list_of_fields_in_time_period
-                selected_field = st.selectbox("Select a Field to View History", list_of_fields_in_time_period)
+                selected_field = st.selectbox("Select a Field to View History", list_of_fields_in_time_period,width=500)
                 fn.plot_animal_days_for_field(all_grazing_events,selected_field, area_unit)
 
     # --- Field Rest Period section ---
     if st.session_state.rest_data:
         st.warning("The field rest data feature has not yet been implemented ☹️")
 
-elif cattle_data_table is not None and field_data_table is not None and grazing_data_table is not None:
+elif not st.session_state.grazing_data_table.empty and not st.session_state.field_data_table.empty and not st.session_state.cattle_data_table.empty:
     st.error("❌ Please fix identified errors in data input.")
 
 else:

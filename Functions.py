@@ -45,7 +45,7 @@ def process_csv(label,help_text):
         return cleaned_df
     else:
         st.warning("💡 Please upload a CSV file to get started.")
-        return None
+        return pd.DataFrame()
 
 def validate_csv_column_headings(data_table,expected_headings):
         actual_cols = set(data_table.columns)
@@ -105,11 +105,7 @@ def create_input_table(template_data,table_index,index_name,table_key):
     template_table = pd.DataFrame(template_data,index=table_index)
     template_table.index.name = index_name
     # Display table
-    edited_table = st.data_editor(
-        data=template_table, 
-        width="content",
-        key=table_key
-    )
+    edited_table = st.data_editor(data=template_table,width="content",key=table_key,)
     return edited_table
 
 
@@ -327,6 +323,6 @@ def plot_animal_days_for_field(all_grazing_events_data,selected_field, area_unit
     # Plot line chart
     st.subheader(f'Animal days/{area_unit} over time for {selected_field}')
     if selected_field == "All":
-        st.line_chart(data=all_grazing_events_data, x='DATE', y=f'ANIMAL DAYS/{str(area_unit).upper()}', color='FIELD')
+        st.line_chart(data=all_grazing_events_data, x='DATE', y=f'ANIMAL DAYS/{str(area_unit).upper()}', color='FIELD',height=700)
     else:
-        st.line_chart(data=field_history, x='DATE', y=f'ANIMAL DAYS/{str(area_unit).upper()}')
+        st.line_chart(data=field_history, x='DATE', y=f'ANIMAL DAYS/{str(area_unit).upper()}',height=700)
