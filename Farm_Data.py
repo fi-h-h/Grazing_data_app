@@ -25,6 +25,7 @@ animal_days_per_unit_area = pd.DataFrame()
 all_grazing_events = pd.DataFrame()
 animal_days_summary = pd.DataFrame()
 list_of_fields_in_time_period = pd.DataFrame()
+field_rest_data = pd.DataFrame()
 
 # --- DATA INPUT SECTION ---
 
@@ -136,7 +137,36 @@ if not st.session_state.grazing_data_table.empty and not st.session_state.field_
                 
                 # Plot table of most recent grazing events
                 dynamic_height = min(len(animal_days_per_unit_area) * 35 + 40, 1000)
-                st.dataframe(data=animal_days_per_unit_area, width="stretch",hide_index=True,height=dynamic_height)
+                st.dataframe(
+                    data=animal_days_per_unit_area, 
+                    width="stretch",
+                    hide_index=True,
+                    height=dynamic_height,
+                    column_config={
+                        "FIELD": st.column_config.TextColumn(
+                            "FIELD"
+                        ),
+                        "DATE": st.column_config.TextColumn(
+                            "DATE"
+                        ),
+                        "TOTAL LIVESTOCK UNITS": st.column_config.NumberColumn(
+                            "TOTAL LIVESTOCK UNITS",
+                            format="%.1f"
+                        ),
+                        "PADDOCK AREA": st.column_config.NumberColumn(
+                            "PADDOCK AREA",
+                            format="%.2f"
+                        ),
+                        "GRAZING PERIOD": st.column_config.NumberColumn(
+                            "GRAZING PERIOD",
+                            format="%d"
+                        ),
+                        f"ANIMAL DAYS/{str(area_unit).upper()}": st.column_config.NumberColumn(
+                            f"ANIMAL DAYS/{str(area_unit).upper()}",
+                            format="%.1f"
+                        )
+                    }
+                )
 
             with output_col2:
                 # Calculate animal days per unit area over time
@@ -149,7 +179,28 @@ if not st.session_state.grazing_data_table.empty and not st.session_state.field_
                     # Plot table of grazing events
                     animal_days_summary = fn.summary_of_animal_days_per_area_over_time(all_grazing_events,area_unit)
                     dynamic_height = min(len(animal_days_summary) * 35 + 40, 1000)
-                    st.dataframe(animal_days_summary,hide_index=True, width="stretch",height=dynamic_height)
+                    st.dataframe(
+                        data=animal_days_summary,
+                        hide_index=True, 
+                        width="stretch",
+                        height=dynamic_height,
+                        column_config={
+                            "FIELD": st.column_config.TextColumn(
+                            "FIELD"
+                        ),
+                        "NO. OF GRAZING EVENTS": st.column_config.TextColumn(
+                            "NO. OF GRAZING EVENTS"
+                        ),
+                        f"TOTAL ANIMAL DAYS/{str(area_unit).upper()}": st.column_config.NumberColumn(
+                            f"TOTAL ANIMAL DAYS/{str(area_unit).upper()}",
+                            format="%.1f"
+                        ),
+                        f"AVERAGE ANIMAL DAYS/{str(area_unit).upper()}": st.column_config.NumberColumn(
+                            f"TOTAL ANIMAL DAYS/{str(area_unit).upper()}",
+                            format="%.1f"
+                        )
+                    }
+                )
 
             # Plot graph of user selected field or all fields
             if not animal_days_summary.empty:
@@ -160,7 +211,13 @@ if not st.session_state.grazing_data_table.empty and not st.session_state.field_
 
     # --- Field Rest Period section ---
     if st.session_state.rest_data:
-        st.warning("The field rest data feature has not yet been implemented ☹️")
+        field_rest_data = fn.calculate_field_rest_data(st.session_state.grazing_data_table,st.session_state.field_data_table)
+        if not field_rest_data.empty:
+            st.title("🌱 Field Rest Period Output",text_alignment="center")
+            dynamic_height = min(len(field_rest_data) * 35 + 40, 1000)
+            st.dataframe(field_rest_data,hide_index=True, width="stretch",height=dynamic_height)
+        else:
+            st.warning("⚠️ No grazing data found, please check inputs")
 
 elif not st.session_state.grazing_data_table.empty and not st.session_state.field_data_table.empty and not st.session_state.cattle_data_table.empty:
     st.error("❌ Please fix identified errors in data input.")

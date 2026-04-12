@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import re
+import datetime as dt
 
 def extract_number(value):
     # If it's already a number, just return it
@@ -11,7 +12,7 @@ def extract_number(value):
     # If it's a string pull out the number
     if isinstance(value, str):
         # This regex finds digits and decimal points
-        match = re.search(r"(\d+\.?\d*)", value)
+        match = re.search(r"(-?\d+\.?\d*)", value)
         if match:
             return float(match.group(1))
 
@@ -197,7 +198,7 @@ def calculate_most_recent_animal_days_per_area(grazing_data_table, cattle_data_t
                         
                         if multiple_paddocks:
                             paddock_use = 1.0
-                        break # This is your 'Exit For'
+                        break
                     else:
                         multiple_paddocks = True
             
@@ -307,7 +308,7 @@ def summary_of_animal_days_per_area_over_time(full_table,field_area_unit):
     field_summary = full_table.groupby('FIELD')[f'ANIMAL DAYS/{str(field_area_unit).upper()}'].agg(['count', 'sum', 'mean']).reset_index()
 
     # Set colum names and round numbers
-    field_summary.columns = ['FIELD','NUMBER OF GRAZING EVENTS',f'TOTAL ANIMAL DAYS/{str(field_area_unit).upper()}',f'AVERAGE ANIMAL DAYS/{str(field_area_unit).upper()}']
+    field_summary.columns = ['FIELD','NO. OF GRAZING EVENTS',f'TOTAL ANIMAL DAYS/{str(field_area_unit).upper()}',f'AVERAGE ANIMAL DAYS/{str(field_area_unit).upper()}']
     field_summary[f'TOTAL ANIMAL DAYS/{str(field_area_unit).upper()}'] = field_summary[f'TOTAL ANIMAL DAYS/{str(field_area_unit).upper()}'].round(1)
     field_summary[f'AVERAGE ANIMAL DAYS/{str(field_area_unit).upper()}'] = field_summary[f'AVERAGE ANIMAL DAYS/{str(field_area_unit).upper()}'].round(1)
     return field_summary
@@ -326,3 +327,81 @@ def plot_animal_days_for_field(all_grazing_events_data,selected_field, area_unit
         st.line_chart(data=all_grazing_events_data, x='DATE', y=f'ANIMAL DAYS/{str(area_unit).upper()}', color='FIELD',height=700)
     else:
         st.line_chart(data=field_history, x='DATE', y=f'ANIMAL DAYS/{str(area_unit).upper()}',height=700)
+
+def calculate_field_rest_data(grazing_data_table, field_table):
+
+    # Pre-index grazing table
+    results = []
+    out_records = grazing_data_table[grazing_data_table['Which field are the cattle moving out of?'] != grazing_data_table['Which field are the cattle moving into?']]
+    
+    # Iterate through fields in field table
+    for field_name in field_table['Field Name']:
+        out_date_str = "-"
+        previous_out_date = None
+        current_rest_days = 0
+        previous_rest_days = 0
+        days_in_field = 0
+        state_on_entry_str = "-"
+        state_on_exit_str = "-"
+
+        # Find OUT record
+        row_out = out_records[out_records['Which field are the cattle moving out of?'] == field_name]
+        
+        if not row_out.empty:
+            # Find latest OUT date
+            last_out_idx = row_out.index[0]
+            last_out_date = row_out.at[last_out_idx, 'Date moved out']
+            out_date_str = last_out_date.strftime('%d/%m/%Y')
+            state_on_exit = extract_number(row_out.at[last_out_idx, 'What does the paddock the cattle are moving out of look like?'])
+
+            if len(row_out) >= 2:
+                # Find previous OUT date
+                previous_out_idx = row_out.index[1]
+                previous_out_date = row_out.at[previous_out_idx, 'Date moved out']          
+
+            # Find the IN record
+            in_date = last_out_date
+            past_moves = grazing_data_table.iloc[last_out_idx + 1:]
+            match_in = past_moves[past_moves['Which field are the cattle moving into?'] == field_name]
+            
+            if not match_in.empty:
+                for index, row in match_in.iterrows():
+                    if row['Which field are the cattle moving into?'] != row['Which field are the cattle moving out of?']:
+                        in_date = row['Date moved in']
+                        state_on_entry = extract_number(row['What does the pasture look like?'])
+                        break
+            
+            # Calculate days previously rested for
+            if previous_out_date is not None:
+                previous_rest_days = (in_date - previous_out_date).days
+
+            # Calculate days currently rested for
+            days_in_field = (last_out_date - in_date).days
+            current_rest_days = (pd.to_datetime(dt.date.today()) - last_out_date).days
+
+            # Set output strings for paddock states
+            if state_on_entry == 1:
+                state_on_entry_str = "Over-rested"
+            elif state_on_entry == 0:
+                state_on_entry_str = "Ideal"
+            elif state_on_entry == -1:
+                state_on_entry_str = "Under-rested"
+
+            if state_on_exit == 1:
+                state_on_exit_str = "Under-grazed"
+            elif state_on_exit == 0:
+                state_on_exit_str = "Ideal"
+            elif state_on_exit == -1:
+                state_on_exit_str = "Over-grazed"
+                
+        results.append({
+            'FIELD': field_name,
+            'MOST RECENT GRAZING EVENT': out_date_str,
+            'PREVIOUSLY RESTED FOR': previous_rest_days,
+            'PADDOCK STATE ON ENTRY': state_on_entry_str,
+            'GRAZING PERIOD': days_in_field,
+            'PADDOCK STATE ON EXIT': state_on_exit_str,
+            'CURRENT DAYS RESTED': current_rest_days
+        })
+
+    return pd.DataFrame(results)
