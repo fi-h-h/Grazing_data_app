@@ -196,7 +196,7 @@ if not st.session_state.grazing_data_table.empty and not st.session_state.field_
                             format="%.1f"
                         ),
                         f"AVERAGE ANIMAL DAYS/{str(area_unit).upper()}": st.column_config.NumberColumn(
-                            f"TOTAL ANIMAL DAYS/{str(area_unit).upper()}",
+                            f"AVERAGE ANIMAL DAYS/{str(area_unit).upper()}",
                             format="%.1f"
                         )
                     }
