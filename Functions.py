@@ -1,3 +1,4 @@
+"""Functions to perform the calculations and data manipulation and analysis for the grazing app"""
 import streamlit as st
 import pandas as pd
 import numpy as np
