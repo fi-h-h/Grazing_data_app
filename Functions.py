@@ -212,7 +212,7 @@ def calculate_most_recent_animal_days_per_area(grazing_data_table, cattle_data_t
             if out_date is not None and in_date is not None:
                 days_in_field = (out_date - in_date).days
                 if days_in_field == 0:
-                    days_in_field = 0.5
+                    days_in_field = 1
                 # Get livestock units for date
                 lu_sums = calculate_animal_groups(out_date,cattle_data_table,lu_data)
                 
@@ -349,8 +349,9 @@ def calculate_field_rest_data(grazing_data_table, field_table):
     
     # Iterate through fields in field table
     for field_name in field_table['Field Name']:
-        out_date_str = "-"
+        last_out_date = None
         previous_out_date = None
+        in_date = None
         current_rest_days = 0
         previous_rest_days = 0
         days_in_field = 0
@@ -364,7 +365,6 @@ def calculate_field_rest_data(grazing_data_table, field_table):
             # Find latest OUT date
             last_out_idx = row_out.index[0]
             last_out_date = row_out.at[last_out_idx, 'Date moved out']
-            out_date_str = last_out_date.strftime('%d/%m/%Y')
             state_on_exit = extract_number(row_out.at[last_out_idx, 'What does the paddock the cattle are moving out of look like?'])
 
             if len(row_out) >= 2:
@@ -373,7 +373,6 @@ def calculate_field_rest_data(grazing_data_table, field_table):
                 previous_out_date = row_out.at[previous_out_idx, 'Date moved out']          
 
             # Find the IN record
-            in_date = last_out_date
             past_moves = grazing_data_table.iloc[last_out_idx + 1:]
             match_in = past_moves[past_moves['Which field are the cattle moving into?'] == field_name]
             
@@ -389,7 +388,10 @@ def calculate_field_rest_data(grazing_data_table, field_table):
                 previous_rest_days = (in_date - previous_out_date).days
 
             # Calculate days currently rested for
-            days_in_field = (last_out_date - in_date).days
+            if last_out_date is not None and in_date is not None:
+                days_in_field = (last_out_date - in_date).days
+                if days_in_field == 0:
+                    days_in_field = 1
             current_rest_days = (pd.to_datetime(dt.date.today()) - last_out_date).days
 
             # Set output strings for paddock states
@@ -409,7 +411,7 @@ def calculate_field_rest_data(grazing_data_table, field_table):
                 
         results.append({
             'FIELD': field_name,
-            'MOST RECENT GRAZING EVENT': out_date_str,
+            'MOST RECENT GRAZING EVENT': last_out_date,
             'PREVIOUSLY RESTED FOR': previous_rest_days,
             'PADDOCK STATE ON ENTRY': state_on_entry_str,
             'GRAZING PERIOD': days_in_field,

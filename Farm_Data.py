@@ -161,7 +161,7 @@ if not st.session_state.grazing_data_table.empty and not st.session_state.field_
                         #),
                         "GRAZING PERIOD": st.column_config.NumberColumn(
                             "GRAZING PERIOD",
-                            format="%.1f"
+                            format="%d"
                         )
                         #"PADDOCK AREA": st.column_config.NumberColumn(
                         #    "PADDOCK AREA",
@@ -190,8 +190,9 @@ if not st.session_state.grazing_data_table.empty and not st.session_state.field_
                             "FIELD": st.column_config.TextColumn(
                             "FIELD"
                         ),
-                        "NO. OF GRAZING EVENTS": st.column_config.TextColumn(
-                            "NO. OF GRAZING EVENTS"
+                        "NO. OF GRAZING EVENTS": st.column_config.NumberColumn(
+                            "NO. OF GRAZING EVENTS",
+                            format="%d"
                         ),
                         f"TOTAL ANIMAL DAYS/{str(area_unit).upper()}": st.column_config.NumberColumn(
                             f"TOTAL ANIMAL DAYS/{str(area_unit).upper()}",
@@ -217,7 +218,38 @@ if not st.session_state.grazing_data_table.empty and not st.session_state.field_
         if not field_rest_data.empty:
             st.title("🌱 Field Rest Period Output",text_alignment="center")
             dynamic_height = min(len(field_rest_data) * 35 + 40, 1000)
-            st.dataframe(field_rest_data,hide_index=True, width="stretch",height=dynamic_height)
+            st.dataframe(
+                data=field_rest_data, 
+                width="stretch",
+                hide_index=True,
+                height=dynamic_height,
+                column_config={
+                    "FIELD": st.column_config.TextColumn(
+                        "FIELD"
+                    ),
+                    "MOST RECENT GRAZING EVENT": st.column_config.DateColumn(
+                        "MOST RECENT GRAZING EVENT"
+                    ),
+                    "PREVIOUSLY RESTED FOR": st.column_config.NumberColumn(
+                        "PREVIOUSLY RESTED FOR",
+                        format="%d"
+                    ),
+                    "PADDOCK STATE ON ENTRY": st.column_config.TextColumn(
+                        "PADDOCK STATE ON ENTRY"
+                    ),
+                    "GRAZING PERIOD": st.column_config.NumberColumn(
+                        "GRAZING PERIOD",
+                        format="%d"
+                    ),
+                    "PADDOCK STATE ON EXIT": st.column_config.TextColumn(
+                        "PADDOCK STATE ON EXIT"
+                    ),
+                    "CURRENT DAYS RESTED": st.column_config.NumberColumn(
+                        "PADDOCK AREA",
+                        format="%d"
+                    )
+                }
+            )
         else:
             st.warning("⚠️ No grazing data found, please check inputs")
 
