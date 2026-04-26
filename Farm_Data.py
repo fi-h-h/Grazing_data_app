@@ -37,7 +37,7 @@ with st.sidebar:
     # 
 
     # Define expected headings
-    expected_cattle_headings = ["Ear Tag Number", "Date of birth", "M/F", "Bull?", "Date on farm", "Date off farm"]
+    expected_cattle_headings = ["Ear Tag Number", "Date of birth", "M/F", "Bull?", "Empty?", "Date on farm", "Date off farm"]
     expected_field_headings = ["Field Name", "Field Area (Hectare)", "Field Area (Acre)"]
     expected_grazing_headings = ["Your name", "Management group", "Date moved out", "Which field are the cattle moving out of?", "What does the paddock the cattle are moving out of look like?", "Date moved in",	
                                 "Which field are the cattle moving into?", "How has the field been split?", "Is this the first, second, third...paddock in the field?", "What does the pasture look like?", "What do the cattle look like?"]
@@ -134,7 +134,6 @@ if not st.session_state.grazing_data_table.empty and not st.session_state.field_
                 # Calculate animal days per unit area for most recent grazing
                 st.subheader("Most Recent Grazing Event",text_alignment="center")
                 animal_days_per_unit_area = fn.calculate_most_recent_animal_days_per_area(st.session_state.grazing_data_table,st.session_state.cattle_data_table,st.session_state.field_data_table,area_unit, lu_input_parameters["VALUE"])
-                
                 # Plot table of most recent grazing events
                 dynamic_height = min(len(animal_days_per_unit_area) * 35 + 40, 1000)
                 st.dataframe(
@@ -146,25 +145,28 @@ if not st.session_state.grazing_data_table.empty and not st.session_state.field_
                         "FIELD": st.column_config.TextColumn(
                             "FIELD"
                         ),
-                        "DATE": st.column_config.TextColumn(
+                        "DATE": st.column_config.DateColumn(
                             "DATE"
+                        ),
+                        f"ANIMAL DAYS/{str(area_unit).upper()}": st.column_config.NumberColumn(
+                            f"ANIMAL DAYS/{str(area_unit).upper()}",
+                            format="%.1f"
                         ),
                         "TOTAL LIVESTOCK UNITS": st.column_config.NumberColumn(
                             "TOTAL LIVESTOCK UNITS",
                             format="%.1f"
                         ),
-                        "PADDOCK AREA": st.column_config.NumberColumn(
-                            "PADDOCK AREA",
-                            format="%.2f"
-                        ),
+                        #"GROUPS": st.column_config.TextColumn(
+                        #    "GROUPS"
+                        #),
                         "GRAZING PERIOD": st.column_config.NumberColumn(
                             "GRAZING PERIOD",
-                            format="%d"
-                        ),
-                        f"ANIMAL DAYS/{str(area_unit).upper()}": st.column_config.NumberColumn(
-                            f"ANIMAL DAYS/{str(area_unit).upper()}",
                             format="%.1f"
                         )
+                        #"PADDOCK AREA": st.column_config.NumberColumn(
+                        #    "PADDOCK AREA",
+                        #    format="%.2f"
+                        #)
                     }
                 )
 

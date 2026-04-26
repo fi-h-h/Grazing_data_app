@@ -120,36 +120,42 @@ def calculate_animal_groups(calc_date,cattle_data,lu_data):
     age_months = ((calc_date - active["Date of birth"]).dt.days / 30.4735)
     
     # Define logic bins
-    # Bins: 0-3, 3-6, 6-12, 12-24, 24+
-    labels = ["calves_03", "calves_36", "calves_612", "youngstock", "adults"]
-    active["Group_Key"] = pd.cut(age_months, bins=[0, 3, 6, 12, 24, 1000], labels=labels)
+    # Bins: 0-3, 3-6, 6-10, 10-12, 12-24, 24+
+    labels = ["calves_03", "calves_36", "calves_610", "youngstock_1012", "youngstock_1224", "adults"]
+    active["Group_Key"] = pd.cut(age_months, bins=[0, 3, 6, 10, 12, 24, 1000], labels=labels)
     
     # Map specific lus from lu_data
     lu_lookup = {
-        "calves_03": lu_data.iloc[4], "calves_36": lu_data.iloc[3],
-        "calves_612": lu_data.iloc[2], "youngstock": lu_data.iloc[1], "adults": lu_data.iloc[0]
+        "calves_03": lu_data.iloc[4], "calves_36": lu_data.iloc[3], "calves_610": lu_data.iloc[2],
+        "youngstock_1012": lu_data.iloc[2], "youngstock_1224": lu_data.iloc[1], "adults": lu_data.iloc[0]
     }
     active["Livestock Unit"] = active["Group_Key"].map(lu_lookup).astype(float)
     
     # Map final Group Names for matching
-    # Define conditions for the 'adults' category (24+ months)
-    is_adult = (active["Group_Key"] == "adults")
-    is_female = (active["M/F"].astype(str).str.strip().str.upper() == "F")
+    is_female = (active["M/F"].astype(str).str.strip().str.upper().isin(["F", "Female", "FEMALE"]))
     is_bull = (active["Bull?"].astype(str).str.strip().str.upper().isin(["YES", "Y", "TRUE"]))
-    # Assign specific names to the adults
+    is_empty = (active["Empty?"].astype(str).str.strip().str.upper().isin(["YES", "Y", "TRUE"]))
+
+    # Define conditions for the 'youngstock' category (10-24 months) and adults (24+ months)
+    is_youngstock = (active["Group_Key"] == "youngstock_1012") | (active["Group_Key"] == "youngstock_1224")
+    is_adult = (active["Group_Key"] == "adults")
+
+    # Assign specific names
     conditions = [
+        (is_youngstock & is_female),
+        (is_youngstock & is_bull),
+        (is_youngstock),
         (is_adult & is_bull),
-        (is_adult & is_female),
+        (is_adult & is_empty),
         (is_adult)
     ]
-    choices = ["bulls", "cows", "steer"]
+    choices = ["heifers", "young bulls", "steers", "bulls", "empty cows", "cows"]
     active["Group"] = np.select(conditions, choices, default=None)
-    # Fill in the non-adults (calves and youngstock)
+    # Fill in the calves
     name_map = {
         "calves_03": "calves", 
         "calves_36": "calves", 
-        "calves_612": "calves", 
-        "youngstock": "youngstock"
+        "calves_610": "calves"
     }
     active["Group"] = active["Group"].fillna(active["Group_Key"].map(name_map))
     
@@ -167,13 +173,15 @@ def calculate_most_recent_animal_days_per_area(grazing_data_table, cattle_data_t
     
     # Iterate through fields in field table
     for field_name in field_table['Field Name']:
-        out_date_str = "-"
+        out_date = None
+        in_date = None
         total_lu = 0.0
         days_in_field = 0
         animal_days = 0.0
         base_area = field_area_map.get(field_name, 0)
         paddock_use = 1.0
         effective_area = base_area * paddock_use
+        groups = []
 
         # Find OUT record
         row_out = out_records[out_records['Which field are the cattle moving out of?'] == field_name]
@@ -181,11 +189,9 @@ def calculate_most_recent_animal_days_per_area(grazing_data_table, cattle_data_t
         if not row_out.empty:
             out_idx = row_out.index[0]
             out_date = row_out.at[out_idx, 'Date moved out']
-            out_date_str = out_date.strftime('%d/%m/%Y')
             mgmt_group = str(row_out.at[out_idx, 'Management group']).lower()
             
             # Find the IN record
-            in_date = out_date
             multiple_paddocks = False
             past_moves = grazing_data_table.iloc[out_idx + 1:]
             match_in = past_moves[past_moves['Which field are the cattle moving into?'] == field_name]
@@ -203,16 +209,22 @@ def calculate_most_recent_animal_days_per_area(grazing_data_table, cattle_data_t
                         multiple_paddocks = True
             
             # Calculate days in field
-            days_in_field = (out_date - in_date).days
-            if days_in_field > 0:
+            if out_date is not None and in_date is not None:
+                days_in_field = (out_date - in_date).days
+                if days_in_field == 0:
+                    days_in_field = 0.5
                 # Get livestock units for date
                 lu_sums = calculate_animal_groups(out_date,cattle_data_table,lu_data)
                 
                 # Check which groups match management_group
                 total_lu = 0
-                for group_name in ['cows', 'calves', 'youngstock', 'bulls','steers']:
-                    if group_name in mgmt_group:
+                groups = []
+                for group_name in ['calves', "heifers", "young bulls", "steers", "bulls", "empty cows", "cows"]:
+                    pattern = rf"\b{group_name}\b"
+                    if re.search(pattern, mgmt_group):
                         total_lu += lu_sums.get(group_name, 0)
+                        mgmt_group = re.sub(pattern, " ", mgmt_group)
+                        groups.append(group_name)
                 
                 # Calculate field area
                 effective_area = base_area * paddock_use
@@ -222,11 +234,12 @@ def calculate_most_recent_animal_days_per_area(grazing_data_table, cattle_data_t
                 
         results.append({
             'FIELD': field_name,
-            'DATE': out_date_str,
+            'DATE': out_date,
+            f'ANIMAL DAYS/{str(field_area_unit).upper()}': animal_days,
             'TOTAL LIVESTOCK UNITS': total_lu,
-            'PADDOCK AREA': effective_area,
-            'GRAZING PERIOD': days_in_field,
-            f'ANIMAL DAYS/{str(field_area_unit).upper()}': animal_days
+            #'GROUPS':groups,
+            'GRAZING PERIOD': days_in_field
+            #'PADDOCK AREA': effective_area
         })
 
     return pd.DataFrame(results)
