@@ -47,6 +47,7 @@ with st.sidebar:
     expected_field_headings = ["Field Name", "Field Area (Hectare)", "Field Area (Acre)"]
     expected_grazing_headings = ["Your name", "Management group", "Date moved out", "Which field are the cattle moving out of?", "What does the paddock the cattle are moving out of look like?", "Date moved in",	
                                 "Which field are the cattle moving into?", "How has the field been split?", "Is this the first, second, third...paddock in the field?", "What does the pasture look like?", "What do the cattle look like?"]
+    expected_management_groups = {"calves", "heifers", "young bulls", "steers", "bulls", "empty cows", "cows"}
 
     # Read in cattle data
     st.subheader("🤠 Cattle Data")
@@ -74,6 +75,7 @@ with st.sidebar:
         validation_results.append(fn.validate_csv_column_headings(st.session_state.grazing_data_table,expected_grazing_headings))
         validation_results.append(fn.validate_date_order(st.session_state.grazing_data_table,"Date moved out"))
         validation_results.append(fn.validate_date_order(st.session_state.grazing_data_table,"Date moved in"))
+        validation_results.append(fn.validate_management_groups(st.session_state.grazing_data_table,expected_management_groups))
     
     # Check field names in grazing file matches data in field file
     if not st.session_state.grazing_data_table.empty and not st.session_state.field_data_table.empty:

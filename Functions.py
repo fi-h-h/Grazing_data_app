@@ -102,6 +102,20 @@ def validate_date_order(data_table,col_name):
         st.success(f"✅ Entries in **{col_name}** column are in correct order")
         return True
 
+def validate_management_groups(data_table, management_groups):
+    found_groups = set()
+    for entry in data_table["Management group"].dropna().unique():
+        parts = re.split(r',| and |\.|/|&', entry, flags=re.IGNORECASE)
+        for p in parts:
+            found_groups.add(p.strip().lower())
+    invalid_groups = found_groups - management_groups
+    if invalid_groups:
+        st.error(f"❌ Unexpected management group found in grazing data: {invalid_groups}")
+        return False
+    else:
+        st.success(f"✅ All management groups are correct")
+        return True
+
 def create_input_table(template_data,table_index,index_name,table_key):
     # Create pandas dataframe with template data
     template_table = pd.DataFrame(template_data,index=table_index)
