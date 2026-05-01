@@ -47,7 +47,7 @@ with st.sidebar:
     expected_field_headings = ["Field Name", "Field Area (Hectare)", "Field Area (Acre)"]
     expected_grazing_headings = ["Your name", "Management group", "Date moved out", "Which field are the cattle moving out of?", "What does the paddock the cattle are moving out of look like?", "Date moved in",	
                                 "Which field are the cattle moving into?", "How has the field been split?", "Is this the first, second, third...paddock in the field?", "What does the pasture look like?", "What do the cattle look like?"]
-    expected_management_groups = {"calves", "heifers", "young bulls", "steers", "bulls", "empty cows", "cows"}
+    expected_management_groups = {"calves", "heifers", "young bulls", "steers", "mature bulls", "empty cows", "cows", "other"}
 
     # Read in cattle data
     st.subheader("🤠 Cattle Data")

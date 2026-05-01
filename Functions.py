@@ -158,13 +158,14 @@ def calculate_animal_groups(calc_date,cattle_data,lu_data):
     # Assign specific names
     conditions = [
         (is_youngstock & is_female),
-        (is_youngstock & is_bull),
-        (is_youngstock),
-        (is_adult & is_bull),
-        (is_adult & is_empty),
-        (is_adult)
+        (is_youngstock & ~is_female & is_bull),
+        (is_youngstock & ~is_female & ~is_bull),
+        (is_adult & ~is_female & is_bull),
+        (is_adult & is_female & is_empty),
+        (is_adult & is_female & ~is_empty),
+        (True)
     ]
-    choices = ["heifers", "young bulls", "steers", "bulls", "empty cows", "cows"]
+    choices = ["heifers", "young bulls", "steers", "mature bulls", "empty cows", "cows", "other"]
     active["Group"] = np.select(conditions, choices, default=None)
     # Fill in the calves
     name_map = {
@@ -234,7 +235,7 @@ def calculate_most_recent_animal_days_per_area(grazing_data_table, cattle_data_t
                 # Check which groups match management_group
                 total_lu = 0
                 groups = []
-                for group_name in ['calves', "heifers", "young bulls", "steers", "bulls", "empty cows", "cows"]:
+                for group_name in ['calves', "heifers", "young bulls", "steers", "mature bulls", "empty cows", "cows", "other"]:
                     pattern = rf"\b{group_name}\b"
                     if re.search(pattern, mgmt_group):
                         total_lu += lu_sums.get(group_name, 0)
@@ -411,10 +412,14 @@ def calculate_field_rest_data(grazing_data_table, field_table):
 
             # Set output strings for paddock states
             if state_on_entry == 1:
-                state_on_entry_str = "Over-rested"
+                state_on_entry_str = "Fully recovered - High"
             elif state_on_entry == 0:
-                state_on_entry_str = "Ideal"
+                state_on_entry_str = "Fully recovered - Medium"
             elif state_on_entry == -1:
+                state_on_entry_str = "Fully recovered - Low"
+            elif state_on_entry == -2:
+                state_on_entry_str = "Over-rested"
+            elif state_on_entry == -3:
                 state_on_entry_str = "Under-rested"
 
             if state_on_exit == 1:
